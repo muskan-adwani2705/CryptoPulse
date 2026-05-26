@@ -1,9 +1,5 @@
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Scanner;
 
 import java.io.BufferedReader;
@@ -11,21 +7,22 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
 public class Main {
 
-    static ArrayList<String> favoriteCoins = new ArrayList<>();
+    static ArrayList<String> favoriteCoins =
+            new ArrayList<>();
 
-    static java.util.HashMap<String, Double> portfolio =
-        new java.util.HashMap<>();
-    
+    static HashMap<String, Double> portfolio =
+            new HashMap<>();
+
     static final String FILE_PATH =
             "../data/favorites.txt";
 
+    static final String PORTFOLIO_FILE =
+            "../data/portfolio.txt";
 
-    // Load favorites from file
+
+    // Load favorites
     public static void loadFavorites() {
 
         try {
@@ -56,7 +53,7 @@ public class Main {
     }
 
 
-    // Save favorites to file
+    // Save favorites
     public static void saveFavorites() {
 
         try {
@@ -83,57 +80,96 @@ public class Main {
     }
 
 
-    // Fetch crypto price
-    public static void getCryptoPrice(String coinName) {
+    // Load portfolio
+    public static void loadPortfolio() {
 
         try {
 
-            String apiUrl =
-                    "https://api.coingecko.com/api/v3/simple/price?ids="
-                            + coinName +
-                            "&vs_currencies=usd";
+            BufferedReader reader =
+                    new BufferedReader(
+                            new FileReader(PORTFOLIO_FILE)
+                    );
 
-            HttpClient client = HttpClient.newHttpClient();
+            String line;
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiUrl))
-                    .GET()
-                    .build();
+            while ((line = reader.readLine()) != null) {
 
-            HttpResponse<String> response =
-                    client.send(request, HttpResponse.BodyHandlers.ofString());
+                String[] parts =
+                        line.split(",");
 
-            String jsonResponse = response.body();
+                String coin =
+                        parts[0];
 
-            JsonObject jsonObject =
-                    JsonParser.parseString(jsonResponse).getAsJsonObject();
+                double quantity =
+                        Double.parseDouble(parts[1]);
 
-            if (!jsonObject.has(coinName)) {
-
-                System.out.println("Coin not found!");
-
-                return;
+                portfolio.put(coin, quantity);
 
             }
 
-            JsonObject coinObject =
-                    jsonObject.getAsJsonObject(coinName);
-
-            double price =
-                    coinObject.get("usd").getAsDouble();
-
-            System.out.println("\n======================");
-            System.out.println("Coin: " + coinName.toUpperCase());
-            System.out.println("Price: $" + price);
-            System.out.println("======================");
+            reader.close();
 
         }
 
-        catch (Exception e) {
+        catch (IOException e) {
 
-            System.out.println("Error fetching price!");
+            System.out.println("No previous portfolio found.");
 
         }
+
+    }
+
+
+    // Save portfolio
+    public static void savePortfolio() {
+
+        try {
+
+            FileWriter writer =
+                    new FileWriter(PORTFOLIO_FILE);
+
+            for (String coin : portfolio.keySet()) {
+
+                writer.write(
+                        coin
+                                + ","
+                                + portfolio.get(coin)
+                                + "\n"
+                );
+
+            }
+
+            writer.close();
+
+        }
+
+        catch (IOException e) {
+
+            System.out.println("Error saving portfolio!");
+
+        }
+
+    }
+
+
+    // Fetch crypto price
+    public static void getCryptoPrice(String coinName) {
+
+        double price =
+                CryptoService.getPrice(coinName);
+
+        if (price == -1) {
+
+            System.out.println("Coin not found!");
+
+            return;
+
+        }
+
+        System.out.println("\n======================");
+        System.out.println("Coin: " + coinName.toUpperCase());
+        System.out.println("Price: $" + price);
+        System.out.println("======================");
 
     }
 
@@ -145,7 +181,9 @@ public class Main {
 
         saveFavorites();
 
-        System.out.println(coinName + " added successfully!");
+        System.out.println(
+                coinName + " added successfully!"
+        );
 
     }
 
@@ -153,11 +191,15 @@ public class Main {
     // View favorite coins
     public static void viewFavoriteCoins() {
 
-        System.out.println("\n===== Favorite Coins =====");
+        System.out.println(
+                "\n===== Favorite Coins ====="
+        );
 
         if (favoriteCoins.isEmpty()) {
 
-            System.out.println("No favorite coins added.");
+            System.out.println(
+                    "No favorite coins added."
+            );
 
             return;
 
@@ -170,62 +212,57 @@ public class Main {
         }
 
     }
-    // Add coin to portfolio
-    public static void addToPortfolio(String coinName, double quantity) {
+
+
+    // Add to portfolio
+    public static void addToPortfolio(
+            String coinName,
+            double quantity
+    ) {
 
         portfolio.put(coinName, quantity);
 
-        System.out.println(quantity + " " + coinName
-            + " added to portfolio!");
+        savePortfolio();
+
+        System.out.println(
+                quantity
+                        + " "
+                        + coinName
+                        + " added to portfolio!"
+        );
 
     }
+
 
     // View portfolio
-public static void viewPortfolio() {
+    public static void viewPortfolio() {
 
-    System.out.println("\n===== Portfolio =====");
+        System.out.println(
+                "\n===== Portfolio ====="
+        );
 
-    if (portfolio.isEmpty()) {
+        if (portfolio.isEmpty()) {
 
-        System.out.println("Portfolio is empty!");
+            System.out.println(
+                    "Portfolio is empty!"
+            );
 
-        return;
+            return;
 
-    }
+        }
 
-    double totalValue = 0;
+        double totalValue = 0;
 
-    for (String coin : portfolio.keySet()) {
-
-        try {
-
-            String apiUrl =
-                    "https://api.coingecko.com/api/v3/simple/price?ids="
-                            + coin +
-                            "&vs_currencies=usd";
-
-            HttpClient client = HttpClient.newHttpClient();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(apiUrl))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response =
-                    client.send(request,
-                            HttpResponse.BodyHandlers.ofString());
-
-            String jsonResponse = response.body();
-
-            JsonObject jsonObject =
-                    JsonParser.parseString(jsonResponse)
-                            .getAsJsonObject();
-
-            JsonObject coinObject =
-                    jsonObject.getAsJsonObject(coin);
+        for (String coin : portfolio.keySet()) {
 
             double price =
-                    coinObject.get("usd").getAsDouble();
+                    CryptoService.getPrice(coin);
+
+            if (price == -1) {
+
+                continue;
+
+            }
 
             double quantity =
                     portfolio.get(coin);
@@ -245,45 +282,70 @@ public static void viewPortfolio() {
 
         }
 
-        catch (Exception e) {
-
-            System.out.println("Error loading portfolio!");
-
-        }
-
-    }
-
-    System.out.println("\nTotal Portfolio Value: $"
-            + totalValue);
+        System.out.println(
+                "\nTotal Portfolio Value: $"
+                        + totalValue
+        );
 
     }
+
 
     public static void main(String[] args) {
 
-        Scanner sc = new Scanner(System.in);
+        Scanner sc =
+                new Scanner(System.in);
 
         boolean running = true;
 
-        // Load saved favorites
         loadFavorites();
+
+        loadPortfolio();
 
 
         while (running) {
 
-            System.out.println("\n===== CryptoPulse =====");
+            System.out.println(
+                    "\n===== CryptoPulse ====="
+            );
 
-            System.out.println("1. Check Crypto Price");
-            System.out.println("2. View Favorite Coins");
-            System.out.println("3. Add Favorite Coin");
-            System.out.println("4. Start Live Tracker");
-            System.out.println("5. Add To Portfolio");
-            System.out.println("6. View Portfolio");
-            System.out.println("7. Start Price Alert");
-            System.out.println("8. Exit");
+            System.out.println(
+                    "1. Check Crypto Price"
+            );
 
-            System.out.print("Enter your choice: ");
+            System.out.println(
+                    "2. View Favorite Coins"
+            );
 
-            int choice = sc.nextInt();
+            System.out.println(
+                    "3. Add Favorite Coin"
+            );
+
+            System.out.println(
+                    "4. Start Live Tracker"
+            );
+
+            System.out.println(
+                    "5. Add To Portfolio"
+            );
+
+            System.out.println(
+                    "6. View Portfolio"
+            );
+
+            System.out.println(
+                    "7. Start Price Alert"
+            );
+
+            System.out.println(
+                    "8. Exit"
+            );
+
+            System.out.print(
+                    "Enter your choice: "
+            );
+
+            int choice =
+                    sc.nextInt();
 
             sc.nextLine();
 
@@ -292,10 +354,13 @@ public static void viewPortfolio() {
 
                 case 1:
 
-                    System.out.print("Enter coin name: ");
+                    System.out.print(
+                            "Enter coin name: "
+                    );
 
                     String coinName =
-                            sc.nextLine().toLowerCase();
+                            sc.nextLine()
+                                    .toLowerCase();
 
                     getCryptoPrice(coinName);
 
@@ -311,10 +376,13 @@ public static void viewPortfolio() {
 
                 case 3:
 
-                    System.out.print("Enter coin name: ");
+                    System.out.print(
+                            "Enter coin name: "
+                    );
 
                     String favoriteCoin =
-                            sc.nextLine().toLowerCase();
+                            sc.nextLine()
+                                    .toLowerCase();
 
                     addFavoriteCoin(favoriteCoin);
 
@@ -323,77 +391,108 @@ public static void viewPortfolio() {
 
                 case 4:
 
-                     System.out.print("Enter coin name: ");
+                    System.out.print(
+                            "Enter coin name: "
+                    );
 
-                String liveCoin =
-                        sc.nextLine().toLowerCase();
+                    String liveCoin =
+                            sc.nextLine()
+                                    .toLowerCase();
 
-                PriceTracker tracker =
-                        new PriceTracker(liveCoin);
+                    PriceTracker tracker =
+                            new PriceTracker(liveCoin);
 
-                Thread thread =
-                        new Thread(tracker);
+                    Thread thread =
+                            new Thread(tracker);
 
-                thread.start();
+                    thread.start();
 
-                break;
+                    break;
+
 
                 case 5:
 
-                    System.out.print("Enter coin name: ");
+                    System.out.print(
+                            "Enter coin name: "
+                    );
 
                     String portfolioCoin =
-                        sc.nextLine().toLowerCase();
+                            sc.nextLine()
+                                    .toLowerCase();
 
-                    System.out.print("Enter quantity: ");
+                    System.out.print(
+                            "Enter quantity: "
+                    );
 
                     double quantity =
-                        sc.nextDouble();
+                            sc.nextDouble();
 
                     sc.nextLine();
 
-                    addToPortfolio(portfolioCoin, quantity);
+                    addToPortfolio(
+                            portfolioCoin,
+                            quantity
+                    );
 
                     break;
+
 
                 case 6:
 
                     viewPortfolio();
 
                     break;
-                
+
+
                 case 7:
-                    System.out.print("Enter coin name: ");
+
+                    System.out.print(
+                            "Enter coin name: "
+                    );
 
                     String alertCoin =
-                        sc.nextLine().toLowerCase();
+                            sc.nextLine()
+                                    .toLowerCase();
 
-                    System.out.print("Enter target price: ");
+                    System.out.print(
+                            "Enter target price: "
+                    );
 
                     double targetPrice =
-                        sc.nextDouble();
+                            sc.nextDouble();
 
                     sc.nextLine();
 
                     PriceAlert alert =
-                        new PriceAlert(alertCoin, targetPrice);
+                            new PriceAlert(
+                                    alertCoin,
+                                    targetPrice
+                            );
 
                     Thread alertThread =
-                        new Thread(alert);
+                            new Thread(alert);
 
                     alertThread.start();
 
                     break;
+
+
                 case 8:
+
                     running = false;
 
-                    System.out.println("Exiting CryptoPulse...");
+                    System.out.println(
+                            "Exiting CryptoPulse..."
+                    );
 
                     break;
 
+
                 default:
 
-                    System.out.println("Invalid choice!");
+                    System.out.println(
+                            "Invalid choice!"
+                    );
 
             }
 
@@ -402,4 +501,5 @@ public static void viewPortfolio() {
         sc.close();
 
     }
+
 }
